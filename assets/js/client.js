@@ -28,12 +28,13 @@ Client = {
         });
 
         Client.processFields();
-        $(".google-storage-field").on('change', function () {
+        $(".cloud-storage-field").on('change', function () {
             var files = $(this).prop("files")
             var field = $(this).data('field')
             Client.form = $(this).parents('form:first');
             for (var i = 0; i < files.length; i++) {
-                Client.getSignedURL(files[i].type, files[i].name, field, files[i])
+                // TODO: Get file MD5 hash before uploading. Not available on older browsers.
+                Client.getSignedURL(files[i].type, files[i].name, files[i].size, field, files[i])
             }
 
             //Client.getSignedURL(file[0].type, file[0].name, field)
@@ -128,7 +129,7 @@ Client = {
             }
             // only add form in the first time.
             if (path === undefined) {
-                $('<form class="google-storage-form" enctype="multipart/form-data"><input multiple class="google-storage-field" name="file" data-field="' + prop + '" type="file"/></form>').insertAfter($elem)
+                $('<form class="cloud-storage-form" enctype="multipart/form-data"><input multiple class="cloud-storage-field" name="file" data-field="' + prop + '" type="file"/></form>').insertAfter($elem)
             }
 
             if (path !== undefined) {
@@ -173,7 +174,7 @@ Client = {
             }
         });
     },
-    getSignedURL: function (type, name, field, file) {
+    getSignedURL: function (type, name, size, field, file) {
         $.ajax({
             // Your server script to process the upload
             url: Client.getSignedURLAjax,
@@ -183,6 +184,7 @@ Client = {
             data: {
                 'content_type': type,
                 'file_name': name,
+                'file_size': size,
                 'field_name': field,
                 'record_id': Client.recordId,
                 'event_id': Client.eventId,
@@ -192,7 +194,7 @@ Client = {
             success: function (data) {
                 var response = JSON.parse(data)
                 if (response.status === 'success') {
-                    Client.uploadFile(response.url, type, file, response.path, field)
+                    Client.uploadFile(response.url, type, file, response.path, field, response.headers, response.platform)
                 }
             },
             error: function (request, error) {
@@ -206,88 +208,96 @@ Client = {
             .map(x => x.charCodeAt(0))
             .reduce((a, b) => a + b);
     },
-    uploadFile: function (url, type, file, path, field) {
+    getBlobService: function (sas) {
+       blobUri = 'http://localhost:10000/devstoreaccount1';
+       var blobService = AzureStorage.Blob.createBlobServiceWithSas(blobUri, sas);
+       return blobService;
+    },
+    uploadFile: function (url, type, file, path, field, headers, platform) {
+        {
+            $.ajax({
+                // Your server script to process the upload
+                url: url,
+                type: 'PUT',
 
-        $.ajax({
-            // Your server script to process the upload
-            url: url,
-            type: 'PUT',
+                // Form data
+                data: file,
 
-            // Form data
-            data: file,
+                // Tell jQuery not to process data or worry about content-type
+                // You *must* include these options!
+                processData: false,
+                contentType: false,
+                cache: false,
+                crossDomain: true,
+                headers: headers,
+//            "headers": {
+//                "Access-Control-Allow-Origin": "*",
+//                "Content-Type": type,
+//            },
 
-            // Tell jQuery not to process data or worry about content-type
-            // You *must* include these options!
-            processData: false,
-            contentType: false,
-            cache: false,
-            "headers": {
-                "Access-Control-Allow-Origin": "*",
-                "Content-Type": type,
-            },
-
-            beforeSend: function () {
-                if ($('#' + Client.convertPathToASCII(path)).length) {
-                    $('#' + Client.convertPathToASCII(path)).html('<progress data-name="' + file.name + '"></progress>' + file.name + '<span data-name="' + file.name + '"> <i class="fas fa-window-close"></i></span><br></div>')
-                } else {
-                    $('<div id="' + Client.convertPathToASCII(path) + '"><progress data-name="' + file.name + '"></progress>' + file.name + '<span data-name="' + file.name + '"> <i class="fas fa-window-close"></i></span><br></div>').insertAfter(Client.form);
-                }
-            },
-            complete: function (xhr, status) {
-                if (status == 'success') {
-                    if (Client.filesPath[field] === undefined || Client.filesPath[field] === '') {
-                        Client.filesPath = {
-                            [field]: path
-                        }
+                beforeSend: function () {
+                    if ($('#' + Client.convertPathToASCII(path)).length) {
+                        $('#' + Client.convertPathToASCII(path)).html('<progress data-name="' + file.name + '"></progress>' + file.name + '<span data-name="' + file.name + '"> <i class="fas fa-window-close"></i></span><br></div>')
                     } else {
-                        // only attach if file is new file
-                        if (Client.filesPath[field].indexOf(path) !== false) {
-                            Client.filesPath[field] += ',' + path
+                        $('<div id="' + Client.convertPathToASCII(path) + '"><progress data-name="' + file.name + '"></progress>' + file.name + '<span data-name="' + file.name + '"> <i class="fas fa-window-close"></i></span><br></div>').insertAfter(Client.form);
+                    }
+                },
+                complete: function (xhr, status) {
+                    if (status == 'success') {
+                        if (Client.filesPath[field] === undefined || Client.filesPath[field] === '') {
+                            Client.filesPath = {
+                                [field]: path
+                            }
+                        } else {
+                            // only attach if file is new file
+                            if (Client.filesPath[field].indexOf(path) !== false) {
+                                Client.filesPath[field] += ',' + path
+                            }
                         }
-                    }
-                    // make sure to set the value in case user clicked default save button .
-                    jQuery("input[name=" + field + "]").val(Client.filesPath[field]);
+                        // make sure to set the value in case user clicked default save button .
+                        jQuery("input[name=" + field + "]").val(Client.filesPath[field]);
 
-                    // do not save for surveys
-                    if (Client.isAutoSaveDisabled == false) {
-                        Client.saveRecord(path);
-                    } else {
-                        Client.processFields(path);
-                    }
-
-                }
-
-            },
-            // Custom XMLHttpRequest
-            xhr: function () {
-                var myXhr = $.ajaxSettings.xhr();
-                if (myXhr.upload) {
-                    // For handling the progress of the upload
-                    myXhr.upload.addEventListener('progress', function (e) {
-                        if (e.lengthComputable) {
-                            $('progress[data-name="' + file.name + '"]').attr({
-                                value: e.loaded,
-                                max: e.total,
-                            });
+                        // do not save for surveys
+                        if (Client.isAutoSaveDisabled == false) {
+                            Client.saveRecord(path);
+                        } else {
+                            Client.processFields(path);
                         }
-                    }, false);
 
-                    myXhr.upload.addEventListener('abort', function (e) {
-                        console.log(e)
-                    }, false);
-                }
-
-                var _cancel = $('span[data-name="' + file.name + '"]');
-
-                _cancel.on('click', function () {
-                    if (confirm('Are you sure you want to cancel upload for ' + file.name + '?')) {
-                        myXhr.abort();
-                        $('#' + Client.convertPathToASCII(path)).html('')
                     }
-                })
 
-                return myXhr;
-            }
-        });
+                },
+                // Custom XMLHttpRequest
+                xhr: function () {
+                    var myXhr = $.ajaxSettings.xhr();
+                    if (myXhr.upload) {
+                        // For handling the progress of the upload
+                        myXhr.upload.addEventListener('progress', function (e) {
+                            if (e.lengthComputable) {
+                                $('progress[data-name="' + file.name + '"]').attr({
+                                    value: e.loaded,
+                                    max: e.total,
+                                });
+                            }
+                        }, false);
+
+                        myXhr.upload.addEventListener('abort', function (e) {
+                            console.log(e)
+                        }, false);
+                    }
+
+                    var _cancel = $('span[data-name="' + file.name + '"]');
+
+                    _cancel.on('click', function () {
+                        if (confirm('Are you sure you want to cancel upload for ' + file.name + '?')) {
+                            myXhr.abort();
+                            $('#' + Client.convertPathToASCII(path)).html('')
+                        }
+                    })
+
+                    return myXhr;
+                }
+            });
+        }
     }
 }

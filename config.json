@@ -1,5 +1,5 @@
 {
-  "name": "GoogleStorage",
+  "name": "CloudStorage",
   "namespace": "Stanford\\GoogleStorage",
   "description": "Allow file storage from REDCap projects to Google Cloud",
   "versions": [
@@ -22,6 +22,11 @@
       "name": "Ihab Zeedia",
       "email": "izeedia@stanfordhealthcare.org",
       "institution": "Stanford Health Care"
+    },
+    {
+      "name": "Marius Bezuidenhout",
+      "email": "marius.bezuidenhout@gmail.com",
+      "institution": "N/A"
     }
   ],
   "permissions": [
@@ -44,6 +49,18 @@
     }
   ],
   "project-settings": [
+    {
+      "key": "azure-account-name",
+      "name": "<h5>Azure Account Name</h5>",
+      "required": true,
+      "type": "text"
+    },
+    {
+      "key": "azure-account-key",
+      "name": "<h5>Azure Account Key</h5>",
+      "required": true,
+      "type": "text"
+    },
     {
       "key": "google-project-id",
       "name": "<h5>Google Storage Project ID</h5>",

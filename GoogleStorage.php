@@ -8,6 +8,10 @@ require __DIR__ . '/vendor/autoload.php';
 # Imports the Google Cloud client library
 use Google\Cloud\Storage\StorageClient;
 use Google\Cloud\Storage\Bucket;
+use MicrosoftAzure\Storage\Blob\BlobRestProxy;
+use MicrosoftAzure\Storage\Blob\BlobSharedAccessSignatureHelper;
+use MicrosoftAzure\Storage\Common\Internal\Resources;
+use MicrosoftAzure\Storage\Blob\Internal\BlobResources;
 
 /**
  * Class GoogleStorage
@@ -27,12 +31,15 @@ use Google\Cloud\Storage\Bucket;
  * @property bool $linksDisabled
  * @property bool $isSurvey
  * @property bool $autoSaveDisabled
+ * @property array $platforms
  */
 class GoogleStorage extends \ExternalModules\AbstractExternalModule
 {
 
     use emLoggerTrait;
 
+    const PLATFORM_GOOGLE = 'GOOGLE';
+    const PLATFORM_AZURE  = 'AZURE';
 
     /**
      * @var \Google\Cloud\Storage\StorageClient
@@ -73,6 +80,8 @@ class GoogleStorage extends \ExternalModules\AbstractExternalModule
 
     private $autoSaveDisabled;
 
+    private $platforms;
+
     public function __construct()
     {
         try {
@@ -85,7 +94,7 @@ class GoogleStorage extends \ExternalModules\AbstractExternalModule
 
                 $this->setProject($Proj);
 
-                $this->prepareGoogleStorageFields();
+                $this->prepareStorageFields();
                 //configure google storage object
                 $this->setClient(new StorageClient(['keyFile' => json_decode($this->getProjectSetting('google-api-token'), true), 'projectId' => $this->getProjectSetting('google-project-id')]));
 
@@ -128,18 +137,18 @@ class GoogleStorage extends \ExternalModules\AbstractExternalModule
         include_once $path;
     }
 
-    private function prepareGoogleStorageFields()
+    private function prepareStorageFields()
     {
-        $fields = array();
-        $re = '/^@GOOGLE-STORAGE=/m';
+        $fields = $platforms = array();
+        $re = '/^@(GOOGLE|AZURE)-STORAGE=(.*)$/m';
         foreach ($this->getProject()->metadata as $name => $field) {
-            preg_match_all($re, $field['misc'], $matches, PREG_SET_ORDER, 0);
-            if (!empty($matches)) {
-                $fields[$name] = str_replace('@GOOGLE-STORAGE=', '', $field['misc']);
+            if( preg_match($re, $field['misc'], $matches) ) {
+                $platforms[$name] = $matches[1];
+                $fields[$name] = $matches[2];
             }
-            unset($matches);
         }
         $this->setFields($fields);
+        $this->setPlatforms($platforms);
     }
 
     public function getFieldInstrument($field)
@@ -348,6 +357,28 @@ class GoogleStorage extends \ExternalModules\AbstractExternalModule
         return $url;
     }
 
+    public function getAzureStorageSAS($path, $contentType = 'text/plain', $duration = 3600)
+    {
+        $sasExpiry = new \DateTime();
+        $sasExpiry->add(new \DateInterval('PT6H')); // Add 6 hours to current time.
+        // $helper = new BlobSharedAccessSignatureHelper($this->getProjectSetting('azure-account-name'), $this->getProjectSetting('azure-account-key'));
+        $helper = new BlobSharedAccessSignatureHelper('devstoreaccount1', 'Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==');
+        // Note validateAndSanitizeStringWithArray needs fixing does strlen($input) == '' instead of strlen($input) == 0
+        $azureSasToken = $helper->generateBlobServiceSharedAccessSignatureToken(
+            Resources::RESOURCE_TYPE_BLOB,
+            $path,
+            'racwd',
+            $sasExpiry,
+            new \DateTime(),
+            '',
+            'https,http');
+
+        //$signedUrl = sprintf("http://%s.%s/?%s", $this->getProjectSetting('azure-account-name'), Resources::BLOB_BASE_DNS_NAME, $azureSasToken);
+        $signedUrl = sprintf("http://%s/%s?%s", Resources::EMULATOR_BLOB_URI, 'devstoreaccount1/' . $path, $azureSasToken);
+        $sas = $azureSasToken;
+        return $signedUrl;
+    }
+
     /**
      * @param \Google\Cloud\Storage\Bucket $bucket
      * @param string $objectName
@@ -467,6 +498,37 @@ class GoogleStorage extends \ExternalModules\AbstractExternalModule
     }
 
     /**
+     * @param array $platforms
+     */
+    public function setPlatforms($platforms)
+    {
+        $this->platforms = $platforms;
+    }
+
+
+    /**
+     * @return array
+     */
+    public function getPlatforms()
+    {
+        return $this->platforms;
+    }
+
+    /**
+     * Return the cloud platform used by $field
+     *
+     * @param string $field
+     * @return string|bool
+     */
+    public function getPlatform($field)
+    {
+        if(\array_key_exists($field, $this->getPlatforms()))
+            return $this->getPlatforms()[$field];
+        else
+            return false;
+    }
+
+    /**
      * @return string
      */
     public function getRecordId()
@@ -477,8 +539,11 @@ class GoogleStorage extends \ExternalModules\AbstractExternalModule
     /**
      * @param string $recordId
      */
-    public function setRecordId($recordId)
+    public function setRecordId()
     {
+        if (\func_num_args() < 1)
+            throw new \Exception("Function setRecordId requires at least one argument");
+        $recordId = \func_get_arg(0);
         $this->recordId = $recordId;
     }
 

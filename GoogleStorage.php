@@ -15,31 +15,20 @@ use MicrosoftAzure\Storage\Blob\Internal\BlobResources;
 
 /**
  * Class GoogleStorage
- * @package Stanford\GoogleStorage
- * @property \Google\Cloud\Storage\StorageClient $client
- * @property \Google\Cloud\Storage\Bucket[] $buckets
- * @property array $instances
- * @property array $fields
- * @property array $record
- * @property array $downloadLinks
- * @property array $bucketPrefix
- * @property array $filesPath
- * @property \Project $project
- * @property string $recordId
- * @property int $eventId
- * @property int $instanceId
- * @property bool $linksDisabled
- * @property bool $isSurvey
- * @property bool $autoSaveDisabled
- * @property array $platforms
+ *
+ * Used to for projects to interface with Cloud storage services. Currently supports Google and Azure. Future
+ * expansion should include Amazon AWS.
+ *
+ * @package  Stanford\GoogleStorage
+ * @version  0.0.1
  */
 class GoogleStorage extends \ExternalModules\AbstractExternalModule
 {
 
     use emLoggerTrait;
 
-    const PLATFORM_GOOGLE = 'GOOGLE';
-    const PLATFORM_AZURE  = 'AZURE';
+    public const PLATFORM_GOOGLE = 'GOOGLE';
+    public const PLATFORM_AZURE  = 'AZURE';
 
     /**
      * @var \Google\Cloud\Storage\StorageClient
@@ -56,30 +45,69 @@ class GoogleStorage extends \ExternalModules\AbstractExternalModule
      */
     private $instances;
 
+    /**
+     * @var \Project
+     */
     private $project;
 
+    /**
+     * @var array
+     */
     private $fields;
 
+    /**
+     * @var string
+     */
     private $recordId;
 
+    /**
+     * @var int
+     */
     private $eventId;
 
+    /**
+     * @var $instanceId
+     */
     private $instanceId;
 
+    /**
+     * @var array
+     */
     private $record;
 
+    /**
+     * @var array
+     */
     private $downloadLinks;
 
+    /**
+     * @var array
+     */
     private $bucketPrefix;
 
+    /**
+     * @var array
+     */
     private $filesPath;
 
-    private $linksDisabled;
+    /**
+     * @var bool
+     */
+    protected $linksDisabled;
 
-    private $isSurvey;
+    /**
+     * @var bool
+     */
+    protected $isSurvey;
 
-    private $autoSaveDisabled;
+    /**
+     * @var bool
+     */
+    protected $autoSaveDisabled;
 
+    /**
+     * @var array
+     */
     private $platforms;
 
     public function __construct()
@@ -301,23 +329,37 @@ class GoogleStorage extends \ExternalModules\AbstractExternalModule
         foreach ($this->getFields() as $field => $bucket) {
             if ($record[$this->getRecordId()][$this->getEventId()][$field] != '') {
                 $files = explode(",", $record[$this->getRecordId()][$this->getEventId()][$field]);
-                $bucket = $this->getBucket($field);
+                $platform = $this->getPlatform($field);
 
                 if (!empty($field)) {
                     // check if files still exist in bucket.
                     $prefix = $this->getFullPrefix($files[0]);
-                    $files = $this->getPrefixObjects($bucket, $prefix);
-                    foreach ($files as $file) {
-                        $links[$field][$file] = '';
+                    if($platform == self::PLATFORM_AZURE) {
+                        $helper = new BlobSharedAccessSignatureHelper('devstoreaccount1', 'Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==');
+                        $connectionString = 'DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://172.17.0.1:10000/devstoreaccount1;QueueEndpoint=http://172.17.0.1:10001/devstoreaccount1;';
+                        $azureBlobService = \MicrosoftAzure\Storage\Blob\BlobRestProxy::createBlobService($connectionString);
+                        $listBlobOptions = new \MicrosoftAzure\Storage\Blob\Models\ListBlobsOptions();
+                        $listBlobOptions->setPrefix(\str_replace('redcap/', '', $prefix));
+                        $blobs = $azureBlobService->listBlobs('redcap', $listBlobOptions);
+                        foreach($blobs->getBlobs() as $blob) {
+                            $links[$field][$blob->getName()] = '';
+                            $filesPath[$field] = $blob->getUrl();
+                        }
+                    } else {
+                        $bucket = $this->getBucket($field);
+                        $files = $this->getPrefixObjects($bucket, $prefix);
+                        foreach ($files as $file) {
+                            $links[$field][$file] = '';
 //                        if ($this->isLinksDisabled()) {
-                        $links[$field][$file] = '';
+                            $links[$field][$file] = '';
 //                        } else {
 //                            $links[$field][$file] = $this->getGoogleStorageSignedUrl($bucket, trim($file));
 //                        }
-                        if (isset($filesPath[$field])) {
-                            $filesPath[$field] .= ',' . $file;
-                        } else {
-                            $filesPath[$field] = $file;
+                            if (isset($filesPath[$field])) {
+                                $filesPath[$field] .= ',' . $file;
+                            } else {
+                                $filesPath[$field] = $file;
+                            }
                         }
                     }
                 }
@@ -339,6 +381,27 @@ class GoogleStorage extends \ExternalModules\AbstractExternalModule
         }
 
         return $prefix . $recordId . '/' . $fieldName . '/' . $fileName;
+    }
+
+    public function getAzureStorageDownloadURL($fileName) {
+        $connectionString = 'DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://172.17.0.1:10000/devstoreaccount1;QueueEndpoint=http://172.17.0.1:10001/devstoreaccount1;';
+        $azureBlobService = \MicrosoftAzure\Storage\Blob\BlobRestProxy::createBlobService($connectionString);
+        $url = $azureBlobService->getBlobUrl('redcap', $fileName);
+        $sasExpiry = new \DateTime();
+        $sasExpiry->add(new \DateInterval('PT6H')); // Add 6 hours to current time.
+        // $helper = new BlobSharedAccessSignatureHelper($this->getProjectSetting('azure-account-name'), $this->getProjectSetting('azure-account-key'));
+        $helper = new BlobSharedAccessSignatureHelper('devstoreaccount1', 'Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==');
+        // Note validateAndSanitizeStringWithArray needs fixing does strlen($input) == '' instead of strlen($input) == 0
+        $azureSasToken = $helper->generateBlobServiceSharedAccessSignatureToken(
+            Resources::RESOURCE_TYPE_BLOB,
+            'redcap/' . $fileName,
+            'racwd',
+            $sasExpiry,
+            new \DateTime(),
+            '',
+            'https,http');
+
+        return $url . '?' . $azureSasToken;
     }
 
     /**

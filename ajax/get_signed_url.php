@@ -60,9 +60,13 @@ try {
     } elseif (isset($_GET['action']) && $_GET['action'] == 'download') {
         $fileName = filter_var($_GET['file_name'], \FILTER_SANITIZE_STRING);
         $fieldName = filter_var($_GET['field_name'], \FILTER_SANITIZE_STRING);
-        $platform = filter_var($_GET['platform'], \FILTER_SANITIZE_STRING);
-        $bucket = $module->getBucket($fieldName);
-        $link = $module->getGoogleStorageSignedUrl($bucket, trim($fileName));
+        $platform = $module->getPlatform($fieldName);
+        if($platform == 'AZURE') {
+            $link = $module->getAzureStorageDownloadURL($fileName);
+        } elseif($platform == 'GOOGLE') {
+            $bucket = $module->getBucket($fieldName);
+            $link = $module->getGoogleStorageSignedUrl($bucket, trim($fileName));
+        }
         \REDCap::logEvent(USERID . " generated Download signed URL for $fileName ", '', null, null);
 
         echo json_encode(array('status' => 'success', 'link' => $link));

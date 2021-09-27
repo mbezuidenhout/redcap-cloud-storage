@@ -1,6 +1,6 @@
 <?php
-namespace Stanford\GoogleStorage;
-/** @var \Stanford\GoogleStorage\GoogleStorage $this */
+namespace Stanford\CloudStorage;
+/** @var \Stanford\CloudStorage\CloudStorage $this */
 
 $this->emLog('inside src/client.php');
 ?>

@@ -1,10 +1,17 @@
 {
   "name": "CloudStorage",
-  "namespace": "Stanford\\GoogleStorage",
-  "description": "Allow file storage from REDCap projects to Google Cloud",
+  "namespace": "Stanford\\CloudStorage",
+  "description": "Allow file storage from REDCap projects to Google Cloud or Microsoft Azure",
+  "compatibility": {
+    "php-version-min": "5.6.0",
+    "php-version-max": "",
+    "redcap-version-min": "11.0.0",
+    "redcap-version-max": ""
+  },
   "versions": [
     {
-      "0.1": "Initial"
+      "0.0.1": "Initial",
+      "0.1.0": "Added Azure support"
     }
   ],
   "authors": [
@@ -50,28 +57,111 @@
   ],
   "project-settings": [
     {
+      "key": "azure-enabled",
+      "name": "Enable Azure support",
+      "type": "checkbox"
+    },
+    {
       "key": "azure-account-name",
       "name": "<h5>Azure Account Name</h5>",
       "required": true,
-      "type": "text"
+      "type": "text",
+      "branchingLogic": {
+        "field": "azure-enabled",
+        "value": "true"
+      }
     },
     {
       "key": "azure-account-key",
       "name": "<h5>Azure Account Key</h5>",
       "required": true,
-      "type": "text"
+      "type": "text",
+      "branchingLogic": {
+        "field": "azure-enabled",
+        "value": "true"
+      }
+    },
+    {
+      "key": "azure-sandbox",
+      "name": "Azure test mode (Azurite)",
+      "type": "checkbox",
+      "branchingLogic": {
+        "field": "azure-enabled",
+        "value": "true"
+      }
+    },
+    {
+      "key": "azure-sandbox-endpoint",
+      "name": "Azurite server endpoint",
+      "type": "text",
+      "branchingLogic": {
+        "conditions": [
+          {
+            "field": "azure-enabled",
+            "value": "true"
+          },
+          {
+            "field": "azure-sandbox",
+            "value": "true"
+          }
+        ]
+      }
+    },
+    {
+      "key": "azure-browser-endpoint",
+      "name": "Azurite browser endpoint",
+      "type": "text",
+      "branchingLogic": {
+        "conditions": [
+          {
+            "field": "azure-enabled",
+            "value": "true"
+          },
+          {
+            "field": "azure-sandbox",
+            "value": "true"
+          }
+        ]
+      }
+    },
+    {
+      "key": "azure-test-connection",
+      "name": "Azure connection",
+      "type": "button",
+      "url":
+      {
+        "name": "Test",
+        "value": "azureTestConnectionPage.php"
+      },
+      "branchingLogic": {
+        "field": "azure-enabled",
+        "value": "true"
+      }
+    },
+    {
+      "key": "google-enabled",
+      "name": "Enable Google Storage support",
+      "type": "checkbox"
     },
     {
       "key": "google-project-id",
       "name": "<h5>Google Storage Project ID</h5>",
       "required": true,
-      "type": "text"
+      "type": "text",
+      "branchingLogic": {
+        "field": "google-enabled",
+        "value": "true"
+      }
     },
     {
       "key": "google-api-token",
       "name": "<h5>Google Storage API Service Account</h5>",
       "required": true,
-      "type": "textarea"
+      "type": "textarea",
+      "branchingLogic": {
+        "field": "google-enabled",
+        "value": "true"
+      }
     },
     {
       "key": "instance",
@@ -92,7 +182,25 @@
           "required": false,
           "type": "text"
         }
-      ]
+      ],
+      "branchingLogic": {
+        "field": "google-enabled",
+        "value": "true"
+      }
+    },
+    {
+      "key": "google-test-connection",
+      "name": "Google cloud platform connection",
+      "type": "button",
+      "url":
+      {
+        "name": "Test",
+        "value": "google-test-connection-page.php"
+      },
+      "branchingLogic": {
+        "field": "google-enabled",
+        "value": "true"
+      }
     },
     {
       "key": "disable-file-link",

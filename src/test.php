@@ -1,6 +1,6 @@
 <?php
-namespace Stanford\GoogleStorage;
-/** @var \Stanford\GoogleStorage\GoogleStorage $module */
+namespace Stanford\CloudStorage;
+/** @var \Stanford\CloudStorage\CloudStorage $module */
 try {
     $bucket = $module->getClient()->bucket('redcap-storage-test');
     $object = $bucket->object('config.json');

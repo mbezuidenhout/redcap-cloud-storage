@@ -1,6 +1,6 @@
 <?php
-namespace Stanford\GoogleStorage;
-/** @var \Stanford\GoogleStorage\GoogleStorage $module */
+namespace Stanford\CloudStorage;
+/** @var \Stanford\CloudStorage\CloudStorage $module */
 
 require_once $module->getModulePath() . '/google_src/vendor/autoload.php';
 

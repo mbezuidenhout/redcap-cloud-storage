@@ -1,28 +1,24 @@
 <?php
 
-namespace Stanford\GoogleStorage;
+namespace Stanford\CloudStorage;
 
 require_once "emLoggerTrait.php";
+require_once "googleStorage.php";
+require_once "azureStorage.php";
 require __DIR__ . '/vendor/autoload.php';
 
-# Imports the Google Cloud client library
-use Google\Cloud\Storage\StorageClient;
-use Google\Cloud\Storage\Bucket;
-use MicrosoftAzure\Storage\Blob\BlobRestProxy;
-use MicrosoftAzure\Storage\Blob\BlobSharedAccessSignatureHelper;
-use MicrosoftAzure\Storage\Common\Internal\Resources;
-use MicrosoftAzure\Storage\Blob\Internal\BlobResources;
+use Stanford\CloudStorage\emLoggerTrait;
 
 /**
  * Class GoogleStorage
  *
- * Used to for projects to interface with Cloud storage services. Currently supports Google and Azure. Future
- * expansion should include Amazon AWS.
+ * Used to for projects to interface with Cloud storage services. Supports Google and Azure. Future
+ * expansion to include Amazon AWS.
  *
- * @package  Stanford\GoogleStorage
+ * @package  Stanford\CloudStorage
  * @version  0.0.1
  */
-class GoogleStorage extends \ExternalModules\AbstractExternalModule
+class CloudStorage extends \ExternalModules\AbstractExternalModule
 {
 
     use emLoggerTrait;
@@ -31,29 +27,9 @@ class GoogleStorage extends \ExternalModules\AbstractExternalModule
     public const PLATFORM_AZURE  = 'AZURE';
 
     /**
-     * @var \Google\Cloud\Storage\StorageClient
-     */
-    private $client;
-
-    /**
-     * @var \Google\Cloud\Storage\Bucket[]
-     */
-    private $buckets;
-
-    /**
-     * @var array
-     */
-    private $instances;
-
-    /**
      * @var \Project
      */
     private $project;
-
-    /**
-     * @var array
-     */
-    private $fields;
 
     /**
      * @var string
@@ -106,35 +82,51 @@ class GoogleStorage extends \ExternalModules\AbstractExternalModule
     protected $autoSaveDisabled;
 
     /**
-     * @var array
+     * Array of CloudStoragePlatform instances.
+     *
+     * @var CloudStoragePlatform[]
      */
-    private $platforms;
+    protected $storagePlatforms;
+
+    /**
+     * Array of platforms and their fields associated with them.
+     */
+    private $platformFields;
 
     public function __construct()
     {
         try {
             parent::__construct();
 
-            if (isset($_GET['pid']) && $this->getProjectSetting('google-api-token') != '' && $this->getProjectSetting('google-project-id') != '') {
-                $this->setInstances();
-
+            if (isset($_GET['pid']) && $this->getProjectSetting('azure-enabled') || $this->getProjectSetting('google-enabled')) {
                 global $Proj;
 
-                $this->setProject($Proj);
+                $this->project = $Proj;
 
-                $this->prepareStorageFields();
-                //configure google storage object
-                $this->setClient(new StorageClient(['keyFile' => json_decode($this->getProjectSetting('google-api-token'), true), 'projectId' => $this->getProjectSetting('google-project-id')]));
+                if ($this->getProjectSetting('azure-enabled')) {
+                    $this->storagePlatforms[self::PLATFORM_AZURE] = new Azure(
+                        $this->getProjectSetting('azure-account-name'),
+                        $this->getProjectSetting('azure-account-key'),
+                        $this->getProjectSetting('azure-sandbox'),
+                        $this->getProjectSetting('azure-sandbox-endpoint'),
+                        $this->getProjectSetting('azure-browser-endpoint')
+                    );
+                    $fields = $this->setStorageFields($this->storagePlatforms[self::PLATFORM_AZURE], self::PLATFORM_AZURE . "-STORAGE");
+                    $this->platformFields[self::PLATFORM_AZURE] = $fields;
 
-                if (!empty($this->getInstances())) {
-                    $buckets = array();
-                    $prefix = array();
-                    foreach ($this->getInstances() as $instance) {
-                        $buckets[$instance['google-storage-bucket']] = $this->getClient()->bucket($instance['google-storage-bucket']);
-                        $prefix[$instance['google-storage-bucket']] = $instance['google-storage-bucket-prefix'];
+                }
+
+                if ($this->getProjectSetting('google-enabled')) {
+                    if ($this->getProjectSetting('google-api-token') != '' && $this->getProjectSetting('google-project-id') != '') {
+                        $this->storagePlatforms[self::PLATFORM_GOOGLE] = new Google($this->getProjectSetting('google-api-token'), $this->getProjectSetting('google-project-id'));
+                        $fields = $this->setStorageFields($this->storagePlatforms[self::PLATFORM_GOOGLE], self::PLATFORM_GOOGLE . "-STORAGE");
+                        $this->platformFields[self::PLATFORM_GOOGLE] = $fields;
+                        foreach ($this->getSubSettings('instance', $this->getProjectId()) as $bucket) {
+                            if(\is_array($bucket) && \array_key_exists('google-storage-bucket', $bucket) && !empty($container['google-storage-bucket'])) {
+                                $this->storagePlatforms[self::PLATFORM_GOOGLE]->addBucket($bucket['google-storage-bucket'], $bucket['google-storage-bucket-prefix']);
+                            }
+                        }
                     }
-                    $this->setBuckets($buckets);
-                    $this->setBucketPrefix($prefix);
                 }
 
                 // set flag to display uploaded file download links
@@ -158,6 +150,58 @@ class GoogleStorage extends \ExternalModules\AbstractExternalModule
     }
 
     /**
+     * Tests connection to platform and returns true on success.
+     *
+     * @param string $platform Platform to test
+     *
+     * @return bool
+     */
+    public function testConnection($platform)
+    {
+        return $this->storagePlatforms[$platform]->testConnection();
+    }
+
+    /**
+     * Get CloudStoragePlatform instance from $fielName
+     *
+     * @param string $fieldName
+     * @return CloudStoragePlatform
+     */
+    public function getPlatformByFieldName($fieldName)
+    {
+        return $this->storagePlatforms[$this->getPlatformNameByFieldName($fieldName)];
+    }
+
+    /**
+     * Get the bucket or container to use for $fieldName
+     *
+     * @param string $fieldName
+     * @return string
+     */
+    public function getBucketOrContainerNameByFieldName($fieldName)
+    {
+        $platform = $this->getPlatformNameByFieldName($fieldName);
+        $bucketOrContainerName = $this->platformFields[$platform][$fieldName];
+        return $bucketOrContainerName;
+    }
+
+    /**
+     * @param $fieldName
+     * @return false|CloudStoragePlatform
+     */
+    public function getPlatformNameByFieldName($fieldName)
+    {
+        $platform = false;
+        foreach($this->platformFields as $platform => $fields) {
+            if (\in_array($fieldName, $fields)) {
+                $platform = $this->storagePlatforms[$platform];
+                break;
+            }
+        }
+        return $platform;
+    }
+
+    /**
      * @param string $path
      */
     public function includeFile($path)
@@ -165,29 +209,34 @@ class GoogleStorage extends \ExternalModules\AbstractExternalModule
         include_once $path;
     }
 
-    private function prepareStorageFields()
+    /**
+     * Set the list of fields which this $platform is responsible for
+     *
+     * @param CloudStoragePlatform $storagePlatform Instance of CloudStoragePlatform.
+     * @param string $platformString The platform string to search for in the field metadata.
+     * @return array An array of matched field names.
+     */
+    private function setStorageFields($storagePlatform, $platformString)
     {
-        $fields = $platforms = array();
-        $re = '/^@(GOOGLE|AZURE)-STORAGE=(.*)$/m';
-        foreach ($this->getProject()->metadata as $name => $field) {
+        $fields = array();
+        $re = '/^@' . $platformString . '=(.*)$/m';
+        foreach ($this->project->metadata as $name => $field) {
             if( preg_match($re, $field['misc'], $matches) ) {
-                $platforms[$name] = $matches[1];
-                $fields[$name] = $matches[2];
+                $fields[$name] = $matches[1];
             }
         }
-        $this->setFields($fields);
-        $this->setPlatforms($platforms);
+        $storagePlatform->setFields($fields);
+        return $fields;
     }
 
     public function getFieldInstrument($field)
     {
-        foreach ($this->getProject()->forms as $name => $form) {
+        foreach ($this->project->forms as $name => $form) {
             if (array_key_exists($field, $form['fields'])) {
                 return $name;
             }
         }
     }
-
 
     public function saveRecord()
     {
@@ -199,8 +248,8 @@ class GoogleStorage extends \ExternalModules\AbstractExternalModule
             $form = $this->getFieldInstrument($field);
         }
         $this->setEventId(filter_var($_POST['event_id'], FILTER_SANITIZE_NUMBER_INT));
-        $data['redcap_event_name'] = $this->getProject()->getUniqueEventNames($this->getEventId());
-        if ($this->getProject()->isRepeatingForm($this->getEventId(), $form)) {
+        $data['redcap_event_name'] = $this->project->getUniqueEventNames($this->getEventId());
+        if ($this->project->isRepeatingForm($this->getEventId(), $form)) {
             $data['redcap_repeat_instance'] = filter_var($_POST['instance_id'], FILTER_SANITIZE_NUMBER_INT);
             $data['redcap_repeat_instrument'] = $form;
         }
@@ -270,7 +319,7 @@ class GoogleStorage extends \ExternalModules\AbstractExternalModule
         try {
             $this->setIsSurvey(preg_match("/surveys\/\?s=[a-zA-Z0-9]{10}/m", $_SERVER['REQUEST_URI']));
             // in case we are loading record homepage load its the record children if existed
-            if ((strpos($_SERVER['SCRIPT_NAME'], 'DataEntry/index.php') !== false || $this->isSurvey()) && $this->getFields()) {
+            if ((strpos($_SERVER['SCRIPT_NAME'], 'DataEntry/index.php') !== false || $this->isSurvey()) && sizeof($this->platformFields) > 0) {
 
                 if (isset($_GET['event_id'])) {
                     $this->setEventId(filter_var($_GET['event_id'], FILTER_SANITIZE_NUMBER_INT));
@@ -324,84 +373,36 @@ class GoogleStorage extends \ExternalModules\AbstractExternalModule
     public function prepareDownloadLinks()
     {
         $record = $this->getRecord();
-        $links = array();
-        $filesPath = array();
+        $downloadUrls = array();
         foreach ($this->getFields() as $field => $bucket) {
             if ($record[$this->getRecordId()][$this->getEventId()][$field] != '') {
                 $files = explode(",", $record[$this->getRecordId()][$this->getEventId()][$field]);
-                $platform = $this->getPlatform($field);
+                $platform = $this->getPlatformByFieldName($field);
+                $platformName = $this->getPlatformNameByFieldName($field);
 
-                if (!empty($field)) {
-                    // check if files still exist in bucket.
-                    $prefix = $this->getFullPrefix($files[0]);
-                    if($platform == self::PLATFORM_AZURE) {
-                        $helper = new BlobSharedAccessSignatureHelper('devstoreaccount1', 'Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==');
-                        $connectionString = 'DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://172.17.0.1:10000/devstoreaccount1;QueueEndpoint=http://172.17.0.1:10001/devstoreaccount1;';
-                        $azureBlobService = \MicrosoftAzure\Storage\Blob\BlobRestProxy::createBlobService($connectionString);
-                        $listBlobOptions = new \MicrosoftAzure\Storage\Blob\Models\ListBlobsOptions();
-                        $listBlobOptions->setPrefix(\str_replace('redcap/', '', $prefix));
-                        $blobs = $azureBlobService->listBlobs('redcap', $listBlobOptions);
-                        foreach($blobs->getBlobs() as $blob) {
-                            $links[$field][$blob->getName()] = '';
-                            $filesPath[$field] = $blob->getUrl();
-                        }
-                    } else {
-                        $bucket = $this->getBucket($field);
-                        $files = $this->getPrefixObjects($bucket, $prefix);
-                        foreach ($files as $file) {
-                            $links[$field][$file] = '';
-//                        if ($this->isLinksDisabled()) {
-                            $links[$field][$file] = '';
-//                        } else {
-//                            $links[$field][$file] = $this->getGoogleStorageSignedUrl($bucket, trim($file));
-//                        }
-                            if (isset($filesPath[$field])) {
-                                $filesPath[$field] .= ',' . $file;
-                            } else {
-                                $filesPath[$field] = $file;
-                            }
-                        }
+                if (!empty($field) && sizeof($files) > 0 && $platform instanceof CloudStoragePlatform) {
+
+                    foreach($files as $file) {
+                        $downloadUrls[$field][$file] = $platform->getDownloadLink($this->platformFields[$platformName][$field], $file);
                     }
                 }
             }
         }
-        $this->setFilesPath($filesPath);
-        $this->setDownloadLinks($links);
+        $this->setDownloadLinks($downloadUrls);
     }
 
     public function buildUploadPath($prefix, $fieldName, $fileName, $recordId, $eventId, $instanceId)
     {
         $prefix = $prefix != '' ? $prefix . '/' : '';
 
-        if ($this->getProject()->longitudinal) {
+        if ($this->project->longitudinal) {
             return $prefix . $recordId . '/' . $fieldName . '/' . \REDCap::getEventNames($eventId) . '/' . $instanceId . '/' . $fileName;
         }
-        if (!empty($this->getProject()->RepeatingFormsEvents)) {
+        if (!empty($this->project->RepeatingFormsEvents)) {
             return $prefix . $recordId . '/' . $fieldName . '/' . $instanceId . '/' . $fileName;
         }
 
         return $prefix . $recordId . '/' . $fieldName . '/' . $fileName;
-    }
-
-    public function getAzureStorageDownloadURL($fileName) {
-        $connectionString = 'DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://172.17.0.1:10000/devstoreaccount1;QueueEndpoint=http://172.17.0.1:10001/devstoreaccount1;';
-        $azureBlobService = \MicrosoftAzure\Storage\Blob\BlobRestProxy::createBlobService($connectionString);
-        $url = $azureBlobService->getBlobUrl('redcap', $fileName);
-        $sasExpiry = new \DateTime();
-        $sasExpiry->add(new \DateInterval('PT6H')); // Add 6 hours to current time.
-        // $helper = new BlobSharedAccessSignatureHelper($this->getProjectSetting('azure-account-name'), $this->getProjectSetting('azure-account-key'));
-        $helper = new BlobSharedAccessSignatureHelper('devstoreaccount1', 'Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==');
-        // Note validateAndSanitizeStringWithArray needs fixing does strlen($input) == '' instead of strlen($input) == 0
-        $azureSasToken = $helper->generateBlobServiceSharedAccessSignatureToken(
-            Resources::RESOURCE_TYPE_BLOB,
-            'redcap/' . $fileName,
-            'racwd',
-            $sasExpiry,
-            new \DateTime(),
-            '',
-            'https,http');
-
-        return $url . '?' . $azureSasToken;
     }
 
     /**
@@ -418,28 +419,6 @@ class GoogleStorage extends \ExternalModules\AbstractExternalModule
                 'version' => 'v4',
             ]);
         return $url;
-    }
-
-    public function getAzureStorageSAS($path, $contentType = 'text/plain', $duration = 3600)
-    {
-        $sasExpiry = new \DateTime();
-        $sasExpiry->add(new \DateInterval('PT6H')); // Add 6 hours to current time.
-        // $helper = new BlobSharedAccessSignatureHelper($this->getProjectSetting('azure-account-name'), $this->getProjectSetting('azure-account-key'));
-        $helper = new BlobSharedAccessSignatureHelper('devstoreaccount1', 'Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==');
-        // Note validateAndSanitizeStringWithArray needs fixing does strlen($input) == '' instead of strlen($input) == 0
-        $azureSasToken = $helper->generateBlobServiceSharedAccessSignatureToken(
-            Resources::RESOURCE_TYPE_BLOB,
-            $path,
-            'racwd',
-            $sasExpiry,
-            new \DateTime(),
-            '',
-            'https,http');
-
-        //$signedUrl = sprintf("http://%s.%s/?%s", $this->getProjectSetting('azure-account-name'), Resources::BLOB_BASE_DNS_NAME, $azureSasToken);
-        $signedUrl = sprintf("http://%s/%s?%s", Resources::EMULATOR_BLOB_URI, 'devstoreaccount1/' . $path, $azureSasToken);
-        $sas = $azureSasToken;
-        return $signedUrl;
     }
 
     /**
@@ -490,10 +469,11 @@ class GoogleStorage extends \ExternalModules\AbstractExternalModule
      * @param string $fieldName
      * @return string
      */
-    public function getFieldBucketPrefix($fieldName)
+    public function getFieldUploadPrefix($fieldName)
     {
-        $bucketName = $this->getFields()[$fieldName];
-        return $this->getBucketPrefix()[$bucketName];
+        $storagePlatformName = $this->getPlatformNameByFieldName($fieldName);
+        $uploadPrefix = $this->storagePlatforms[$storagePlatformName]->getBucketOrContainerPrefix($this->getFields()[$fieldName]);
+        return $uploadPrefix;
     }
 
     /**
@@ -529,27 +509,15 @@ class GoogleStorage extends \ExternalModules\AbstractExternalModule
     }
 
     /**
-     * @return \Project
-     */
-    public function getProject()
-    {
-        return $this->project;
-    }
-
-    /**
-     * @param \Project $project
-     */
-    public function setProject(\Project $project)
-    {
-        $this->project = $project;
-    }
-
-    /**
-     * @return array
+     * @return array Array of fields and their associated container or bucket
      */
     public function getFields()
     {
-        return $this->fields;
+        $allFields = array();
+        foreach($this->platformFields as $fields) {
+            $allFields = \array_merge($allFields, $fields);
+        }
+        return $allFields;
     }
 
     /**
@@ -558,37 +526,6 @@ class GoogleStorage extends \ExternalModules\AbstractExternalModule
     public function setFields($fields)
     {
         $this->fields = $fields;
-    }
-
-    /**
-     * @param array $platforms
-     */
-    public function setPlatforms($platforms)
-    {
-        $this->platforms = $platforms;
-    }
-
-
-    /**
-     * @return array
-     */
-    public function getPlatforms()
-    {
-        return $this->platforms;
-    }
-
-    /**
-     * Return the cloud platform used by $field
-     *
-     * @param string $field
-     * @return string|bool
-     */
-    public function getPlatform($field)
-    {
-        if(\array_key_exists($field, $this->getPlatforms()))
-            return $this->getPlatforms()[$field];
-        else
-            return false;
     }
 
     /**
@@ -685,7 +622,7 @@ class GoogleStorage extends \ExternalModules\AbstractExternalModule
     /**
      * @return array
      */
-    public function getBucketPrefix(): array
+    public function getBucketPrefix()
     {
         return $this->bucketPrefix;
     }

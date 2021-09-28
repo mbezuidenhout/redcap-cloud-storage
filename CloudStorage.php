@@ -117,8 +117,13 @@ class CloudStorage extends \ExternalModules\AbstractExternalModule
                 }
 
                 if ($this->getProjectSetting('google-enabled')) {
-                    if ($this->getProjectSetting('google-api-token') != '' && $this->getProjectSetting('google-project-id') != '') {
-                        $this->storagePlatforms[self::PLATFORM_GOOGLE] = new Google($this->getProjectSetting('google-api-token'), $this->getProjectSetting('google-project-id'));
+                    if (!empty($this->getProjectSetting('google-project-id'))) {
+                        $this->storagePlatforms[self::PLATFORM_GOOGLE] = new Google(
+                            $this->getProjectSetting('google-project-id'),
+                            $this->getProjectSetting('google-api-token'),
+                            $this->getProjectSetting('google-sandbox'),
+                            $this->getProjectSetting('google-sandbox-endpoint'),
+                        );
                         $fields = $this->setStorageFields($this->storagePlatforms[self::PLATFORM_GOOGLE], self::PLATFORM_GOOGLE . "-STORAGE");
                         $this->platformFields[self::PLATFORM_GOOGLE] = $fields;
                         foreach ($this->getSubSettings('instance', $this->getProjectId()) as $bucket) {
@@ -159,6 +164,17 @@ class CloudStorage extends \ExternalModules\AbstractExternalModule
     public function testConnection($platform)
     {
         return $this->storagePlatforms[$platform]->testConnection();
+    }
+
+    /**
+     * Get the $platform instance.
+     *
+     * @param $platform
+     * @return CloudStoragePlatform
+     */
+    public function getPlatform($platform)
+    {
+        return $this->storagePlatforms[$platform];
     }
 
     /**

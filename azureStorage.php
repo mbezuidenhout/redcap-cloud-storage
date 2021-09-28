@@ -1,4 +1,11 @@
 <?php
+/**
+ * You can test against a local sandbox by running a docker container as follows
+ *
+ * docker run -p 10000:10000 mcr.microsoft.com/azure-storage/azurite azurite-blob --blobHost 0.0.0.0 --blobPort 10000
+ *
+ * and enabling sandbox mode in this module's configuration inside a REDCap project.
+ */
 
 namespace Stanford\CloudStorage;
 
@@ -36,12 +43,7 @@ class Azure extends CloudStoragePlatform {
     /**
      * @var \MicrosoftAzure\Storage\Blob\BlobRestProxy
      */
-    protected $blobRestProxy;
-
-    /**
-     * @var bool
-     */
-    private $isSandbox;
+    protected $restProxy;
 
     /**
      * @param string $accountName Azure account name.
@@ -66,7 +68,7 @@ class Azure extends CloudStoragePlatform {
                 $this->serverEndpoint = AzureResources::EMULATOR_BLOB_URI;
             }
         }
-        $this->blobRestProxy = BlobRestProxy::createBlobService(self::createConnectionString($this->accountName, $this->accountKey, $isSandbox, $this->serverEndpoint));
+        $this->restProxy = BlobRestProxy::createBlobService(self::createConnectionString($this->accountName, $this->accountKey, $isSandbox, $this->serverEndpoint));
     }
 
     public function addContainer($containerName, $containerPrefix = '') {
@@ -99,7 +101,7 @@ class Azure extends CloudStoragePlatform {
 
     public function testConnection()
     {
-        $result = $this->blobRestProxy->listContainers();
+        $result = $this->restProxy->listContainers();
         return true;
     }
 
@@ -117,7 +119,8 @@ class Azure extends CloudStoragePlatform {
         // Container names can contain only lowercase letters, numbers, and hyphens, and must begin and end with a letter or a number. The name can't contain two consecutive hyphens.
         $bucketOrContainer = \strtolower($bucketOrContainer);
 
-        $existingContainers = $this->blobRestProxy->listContainers();
+        // A user might not have the list containers privilege so this code might have to be removed from here to the ->createContainer statement.
+        $existingContainers = $this->restProxy->listContainers();
         $containerExists = false;
         // Container names can contain only lowercase letters, numbers, and hyphens, and must begin and end with a letter or a number. The name can't contain two consecutive hyphens.
         foreach ($existingContainers->getContainers() as $container) {
@@ -127,7 +130,7 @@ class Azure extends CloudStoragePlatform {
             }
         }
         if (!$containerExists) {
-            $this->blobRestProxy->createContainer($bucketOrContainer);
+            $this->restProxy->createContainer($bucketOrContainer);
         }
 
         $createdDate = new \DateTime();
@@ -193,7 +196,7 @@ class Azure extends CloudStoragePlatform {
             $path = \substr($path, strlen($bucketOrContainerName));
         }
         $path = ltrim($path, '/');
-        $url = $this->blobRestProxy->getBlobUrl($bucketOrContainerName, $path);
+        $url = $this->restProxy->getBlobUrl($bucketOrContainerName, $path);
         if(!empty($this->serverEndpoint) && !empty($this->browserEndpoint)) {
             $url = \str_replace($this->serverEndpoint, $this->browserEndpoint, $url);
         }

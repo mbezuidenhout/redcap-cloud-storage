@@ -19,6 +19,13 @@ abstract class CloudStoragePlatform
     protected $serverEndpoint;
 
     /**
+     * Run in sandbox mode
+     *
+     * @var string
+     */
+    protected $isSandbox;
+
+    /**
      * Test the connection to the cloud storage platform and returns true on success or error message on failure.
      *
      * @return bool|string

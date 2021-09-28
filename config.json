@@ -195,7 +195,7 @@
       "url":
       {
         "name": "Test",
-        "value": "google-test-connection-page.php"
+        "value": "googleTestConnectionPage.php"
       },
       "branchingLogic": {
         "field": "google-enabled",

@@ -20,49 +20,18 @@ use Stanford\CloudStorage\CloudUpload;
 class Google extends CloudStoragePlatform {
 
     /**
-     * @var string
-     */
-    private $projectId;
-
-    /**
-     * @var string
-     */
-    private $apiToken;
-
-    /**
      * @var \Google\Cloud\Storage\StorageClient
      */
     private $restProxy;
 
-    /**
-     * @var \Google\Cloud\Storage\Bucket[]
-     */
-    private $buckets;
-
-    public function __construct($projectId, $apiToken, $isSandbox = false, $serverEndpoint = '', $browserEndpoint = '')
+    public function __construct($projectId, $apiToken)
     {
         //configure google storage object
-        $this->projectId = $projectId;
-        $this->apiToken = $apiToken;
-        $this->isSandbox = $isSandbox;
         $storageClientConfig = array(
             'projectId' => $projectId,
             'keyFile'   => \json_decode($apiToken, true)
         );
-        if($isSandbox) {
-            $storageClientConfig['projectId']   = 'emulator-project';
-            if(!empty($serverEndpoint)) {
-                // TODO: Do a sanity check here to make sure $serverEndpoint is in the valid format: (http(s)?://)?(\d{1,3}\.){4}(:\d+)? ie. http(s)://host:port
-                $this->serverEndpoint = $serverEndpoint;
-                $storageClientConfig['apiEndpoint'] = $this->serverEndpoint;
-            }
-        }
         $this->restProxy = new StorageClient($storageClientConfig);
-    }
-
-    public function addBucket($bucketName, $bucketPrefix)
-    {
-        $this->buckets[$bucketName] = $bucketPrefix;
     }
 
     public function testConnection()

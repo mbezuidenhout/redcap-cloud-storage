@@ -126,11 +126,6 @@ class CloudStorage extends \ExternalModules\AbstractExternalModule
                         );
                         $fields = $this->setStorageFields($this->storagePlatforms[self::PLATFORM_GOOGLE], self::PLATFORM_GOOGLE . "-STORAGE");
                         $this->platformFields[self::PLATFORM_GOOGLE] = $fields;
-                        foreach ($this->getSubSettings('instance', $this->getProjectId()) as $bucket) {
-                            if(\is_array($bucket) && \array_key_exists('google-storage-bucket', $bucket) && !empty($container['google-storage-bucket'])) {
-                                $this->storagePlatforms[self::PLATFORM_GOOGLE]->addBucket($bucket['google-storage-bucket'], $bucket['google-storage-bucket-prefix']);
-                            }
-                        }
                     }
                 }
 

@@ -77,7 +77,7 @@ Client = {
 
                     // change few parameter to let redcap save existing record
                     record_exists = 1;
-                    $('input[name ="hidden_edit_flag"]').val(1);
+                    $('input[name="hidden_edit_flag"]').val(1);
 
                 }
             },
@@ -91,6 +91,9 @@ Client = {
     },
     processFields: function (path) {
         for (var prop in Client.fields) {
+            if (1 > jQuery("input[name=" + prop + "]").length) {
+                continue;
+            }
             $elem = jQuery("input[name=" + prop + "]").attr('type', 'hidden');
             var files = Client.downloadLinks[prop];
 
@@ -117,7 +120,7 @@ Client = {
                 } else {
                     // if download links are disable
                     if ((files !== undefined && files[path] != '')) {
-                        $("#" + Client.convertPathToASCII(path)).html('<a class="google-storage-link" target="_blank" href="' + files[path] + '">' + path.split('/').reverse()[0] + '</a><br>')
+                        $("#" + Client.convertPathToASCII(path)).html('<a class="cloud-storage-link" target="_blank" href="' + files[path] + '">' + path.split('/').reverse()[0] + '</a><br>')
                     } else {
                         if (Client.isLinkDisabled) {
                             $("#" + Client.convertPathToASCII(path)).html('<div class="file-name" data-file-id="' + Client.convertPathToASCII(path) + '">' + path.split('/').reverse()[0] + '</div><br>')

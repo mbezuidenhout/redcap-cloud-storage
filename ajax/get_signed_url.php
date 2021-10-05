@@ -18,23 +18,13 @@ try {
         $recordId    = filter_var($_GET['record_id'], \FILTER_SANITIZE_STRING);
         $eventId     = filter_var($_GET['event_id'], \FILTER_SANITIZE_NUMBER_INT);
         $instanceId  = filter_var($_GET['instance_id'], \FILTER_SANITIZE_NUMBER_INT);
-        $prefix      = $module->getFieldUploadPrefix($fieldName);
         $storagePlatform = $module->getPlatformByFieldName($fieldName);
+        $prefix          = $storagePlatform->getUploadPrefix($fieldName);
         $path            = $module->buildUploadPath($prefix, $fieldName, $fileName, $recordId, $eventId, $instanceId);
         $bucketOrContainerName = $module->getBucketOrContainerNameByFieldName($fieldName);
         $upload          = $storagePlatform->createUpload($bucketOrContainerName, $path, $contentType);
         $httpHeaders     = $upload->getHeaders();
         $url             = $upload->getUrl();
-        /*
-        switch ($module->getPlatformNameByFieldName($fieldName)) {
-            case GoogleStorage::PLATFORM_GOOGLE:
-            default:
-                $path        = $module->buildUploadPath($prefix, $fieldName, $fileName, $recordId, $eventId, $instanceId);
-                $bucket = $module->getBucket($fieldName);
-                $url = $module->getGoogleStorageSignedUploadUrl($bucket, $path, $contentType);
-                break;
-        }
-        */
         \REDCap::logEvent(USERID . " generated Upload signed URL for $fileName ", '', null, null);
         echo json_encode(array('status' => 'success', 'url' => $url, 'path' => $path, 'platform' => $module->getPlatform($fieldName), 'headers' => $httpHeaders));
     } elseif (isset($_GET['action']) && $_GET['action'] == 'download') {
@@ -44,14 +34,6 @@ try {
         $platform = $module->getPlatformByFieldName($fieldName);
         $now = new \DateTime();
         $link = $platform->getSignedUrl($bucketOrContainerName, $fileName, $now);
-        /*
-        if($platform == 'AZURE') {
-            $link = $module->getAzureStorageDownloadURL($fileName);
-        } elseif($platform == 'GOOGLE') {
-            $bucket = $module->getBucket($fieldName);
-            $link = $module->getGoogleStorageSignedUrl($bucket, trim($fileName));
-        }
-        */
         \REDCap::logEvent("Generated signed download URL for $fileName by user id " . USERID, '', null, null);
 
         echo json_encode(array('status' => 'success', 'link' => $link));

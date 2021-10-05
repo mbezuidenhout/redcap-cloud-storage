@@ -7,8 +7,6 @@ require_once "googleStorage.php";
 require_once "azureStorage.php";
 require __DIR__ . '/vendor/autoload.php';
 
-use Stanford\CloudStorage\emLoggerTrait;
-
 /**
  * Class GoogleStorage
  *
@@ -120,9 +118,7 @@ class CloudStorage extends \ExternalModules\AbstractExternalModule
                     if (!empty($this->getProjectSetting('google-project-id'))) {
                         $this->storagePlatforms[self::PLATFORM_GOOGLE] = new Google(
                             $this->getProjectSetting('google-project-id'),
-                            $this->getProjectSetting('google-api-token'),
-                            $this->getProjectSetting('google-sandbox'),
-                            $this->getProjectSetting('google-sandbox-endpoint'),
+                            $this->getProjectSetting('google-api-token')
                         );
                         $fields = $this->setStorageFields($this->storagePlatforms[self::PLATFORM_GOOGLE], self::PLATFORM_GOOGLE . "-STORAGE");
                         $this->platformFields[self::PLATFORM_GOOGLE] = $fields;
@@ -202,14 +198,12 @@ class CloudStorage extends \ExternalModules\AbstractExternalModule
      */
     public function getPlatformNameByFieldName($fieldName)
     {
-        $platform = false;
         foreach($this->platformFields as $platform => $fields) {
-            if (\in_array($fieldName, $fields)) {
-                $platform = $this->storagePlatforms[$platform];
-                break;
+            if (\in_array($fieldName, array_keys($fields))) {
+                return $platform;
             }
         }
-        return $platform;
+        return false;
     }
 
     /**
@@ -269,7 +263,6 @@ class CloudStorage extends \ExternalModules\AbstractExternalModule
         if (empty($response['errors'])) {
             $this->setRecord();
             $this->prepareDownloadLinks();
-            $this->uploadLogFile(USERID, $this->getRecordId(), $data['redcap_event_name'], $field, $filesPath);
             return array('status' => 'success', 'links' => $this->getDownloadLinks());
         } else {
             if (is_array($response['errors'])) {
@@ -278,51 +271,6 @@ class CloudStorage extends \ExternalModules\AbstractExternalModule
                 throw new \Exception($response['errors']);
             }
         }
-    }
-
-    private function prepareLogPath($path)
-    {
-        $lofFile = date('Y-m-d') . '.log';
-        $path = $this->getFullPrefix($path) . $lofFile;
-        return $path;
-    }
-
-    private function getFullPrefix($path)
-    {
-        $filePath = explode(',', $path);
-        $match = explode('/', $filePath[0]);
-        $filename = end($match);
-        $path = str_replace($filename, '', $filePath[0]);
-        return $path;
-    }
-
-    private function uploadLogFile($userId, $recordId, $eventName, $field, $path)
-    {
-        $logPath = $this->prepareLogPath($path[$field]);
-        $signedURL = $this->getGoogleStorageSignedUrl($this->getBucket($field), $logPath);
-        $uploadURL = $this->getGoogleStorageSignedUploadUrl($this->getBucket($field), $logPath, 'text/plain');
-        $content = file_get_contents($signedURL);
-        if ($content == false) {
-            $content = "user_id,record_id,event_name,field,path,created_at\n";
-        }
-        $links = explode(',', $path[$field]);
-        $time = time();
-        foreach ($links as $link) {
-            $content .= "$userId,$recordId,$eventName,$field,$link,$time\n";
-        }
-
-        $curl = curl_init();
-        curl_setopt($curl, CURLOPT_URL, $uploadURL);
-        curl_setopt($curl, CURLOPT_TIMEOUT, 30);
-        curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
-        curl_setopt($curl, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-        curl_setopt($curl, CURLOPT_HTTPHEADER, array('Content-Type: text/plain'));
-        curl_setopt($curl, CURLOPT_CUSTOMREQUEST, "PUT");
-        curl_setopt($curl, CURLOPT_POSTFIELDS, $content);
-        if ($response = curl_exec($curl) === false) {
-            throw new \LogicException(curl_error($curl));
-        }
-        curl_close($curl);
     }
 
     public function redcap_every_page_top()
@@ -417,66 +365,6 @@ class CloudStorage extends \ExternalModules\AbstractExternalModule
     }
 
     /**
-     * @param \Google\Cloud\Storage\Bucket $bucket
-     * @param string $objectName
-     * @param int $duration
-     * @return string
-     * @throws \Exception
-     */
-    public function getGoogleStorageSignedUrl($bucket, $objectName, $duration = 50)
-    {
-        $url = $bucket->object($objectName)->signedUrl(new \DateTime('+ ' . $duration . ' seconds'),
-            [
-                'version' => 'v4',
-            ]);
-        return $url;
-    }
-
-    /**
-     * @param \Google\Cloud\Storage\Bucket $bucket
-     * @param string $objectName
-     * @param int $duration
-     * @return string
-     * @throws \Exception
-     */
-    public function getGoogleStorageSignedUploadUrl($bucket, $objectName, $contentType = 'text/plain', $duration = 3600)
-    {
-        $url = $bucket->object($objectName)->signedUrl(new \DateTime('+ ' . $duration . ' seconds'),
-            [
-                'method' => 'PUT',
-                'contentType' => $contentType,
-                'version' => 'v4',
-            ]);
-        return $url;
-    }
-
-    /**
-     * @return \Google\Cloud\Storage\StorageClient
-     */
-    public function getClient()
-    {
-        return $this->client;
-    }
-
-    /**
-     * @param \Google\Cloud\Storage\StorageClient $client
-     */
-    public function setClient(StorageClient $client)
-    {
-        $this->client = $client;
-    }
-
-    /**
-     * @param string $fieldName
-     * @return \Google\Cloud\Storage\Bucket
-     */
-    public function getBucket($fieldName)
-    {
-        $bucketName = $this->getFields()[$fieldName];
-        return $this->getBuckets()[$bucketName];
-    }
-
-    /**
      * @param string $fieldName
      * @return string
      */
@@ -486,23 +374,6 @@ class CloudStorage extends \ExternalModules\AbstractExternalModule
         $uploadPrefix = $this->storagePlatforms[$storagePlatformName]->getBucketOrContainerPrefix($this->getFields()[$fieldName]);
         return $uploadPrefix;
     }
-
-    /**
-     * @return Bucket[]
-     */
-    public function getBuckets()
-    {
-        return $this->buckets;
-    }
-
-    /**
-     * @param Bucket[] $buckets
-     */
-    public function setBuckets($buckets)
-    {
-        $this->buckets = $buckets;
-    }
-
 
     /**
      * @return array
@@ -633,25 +504,18 @@ class CloudStorage extends \ExternalModules\AbstractExternalModule
     /**
      * @return array
      */
-    public function getBucketPrefix()
-    {
-        return $this->bucketPrefix;
-    }
-
-    /**
-     * @param array $bucketPrefix
-     */
-    public function setBucketPrefix(array $bucketPrefix): void
-    {
-        $this->bucketPrefix = $bucketPrefix;
-    }
-
-    /**
-     * @return array
-     */
     public function getFilesPath()
     {
-        return $this->filesPath;
+        $filesPath = array();
+        foreach($this->downloadLinks as $fieldName => $downloadLinks) {
+            $filesPath[$fieldName] = array();
+            $files = array();
+            foreach($downloadLinks as $downloadPath => $downloadLink) {
+                $files[] = $downloadPath;
+            }
+            $filesPath[$fieldName] = implode(',', $files);
+        }
+        return $filesPath;
     }
 
     /**
@@ -709,6 +573,4 @@ class CloudStorage extends \ExternalModules\AbstractExternalModule
     {
         $this->autoSaveDisabled = $autoSaveDisabled;
     }
-
-
 }

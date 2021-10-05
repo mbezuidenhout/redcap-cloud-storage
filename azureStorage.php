@@ -134,7 +134,7 @@ class Azure extends CloudStoragePlatform {
         }
 
         $createdDate = new \DateTime();
-        $url = $this->getSignedUrl($bucketOrContainer, $path, $createdDate, $fileType);
+        $url = $this->getSignedUrl($bucketOrContainer, $path, $createdDate);
 
         $authScheme = new SharedKeyAuthScheme($this->accountName, $this->accountKey);
         // Required headers
@@ -196,7 +196,8 @@ class Azure extends CloudStoragePlatform {
             $path = \substr($path, strlen($bucketOrContainerName));
         }
         $path = ltrim($path, '/');
-        $url = $this->restProxy->getBlobUrl($bucketOrContainerName, $path);
+        $now = new \DateTime();
+        $url = $this->getSignedUrl($bucketOrContainerName, $path, $now);
         if(!empty($this->serverEndpoint) && !empty($this->browserEndpoint)) {
             $url = \str_replace($this->serverEndpoint, $this->browserEndpoint, $url);
         }

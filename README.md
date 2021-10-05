@@ -1,8 +1,14 @@
-# Google Storage
-This EM will allow users to upload files from REDCap form/survey directly into your Google Storage bucket. The upload is 
-happening directly from user client to bucket with no REDCap as middleware. 
+# Cloud Storage
+This EM will allow users to upload files from REDCap form/survey directly into your Google Storage bucket or Azure 
+Datastore. The upload is done directly from user's browser to the cloud with no REDCap as middleware. 
 
-#### Google Storage configuration:
+### Azure Storage configuration:
+1. Create an Azure account by going to https://azure.microsoft.com/
+2. Using the azure console add a new CORS Rule to the storage container. Use the wildcard '*' for Allowed Origins, \
+   Allowed headers and Exposed headers. (**Note: File uploads don't work without the appropriate CORS rules**)
+3. Create a Blob Container by going to you azure console.
+
+### Google Storage configuration:
 1. Create your bucket using following link https://cloud.google.com/storage/docs/creating-buckets#storage-create-bucket-console
 2. Create a Google Storage Service account that will access the bucket on behalf of your REDCap project. https://cloud.google.com/iam/docs/creating-managing-service-accounts
 3. After creating service account a JSON file contains the account credentials will be downloaded on your machine. The EM needs the content of that file for configuration. 
@@ -50,6 +56,7 @@ happening directly from user client to bucket with no REDCap as middleware.
 
 #### REDCap Form Configuration:
 1. Create new text form field. 
-2. In Action Tags/Field Annotation box add following `@GOOGLE-STORAGE=[YOUR_BUCKET_NAME]`
+2. In Action Tags/Field Annotation box add following `@GOOGLE-STORAGE=[YOUR_BUCKET_NAME]` or 
+   `@AZURE-STORAGE=[YOUR_BLOB_CONTAINER]`
 
 ![Alt text](assets/images/redcap-field-config.png?raw=true "REDCap Field Config")

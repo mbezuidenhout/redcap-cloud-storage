@@ -71,6 +71,11 @@ abstract class CloudStoragePlatform
         $this->fields = $fields;
     }
 
+    public function getUploadPrefix($fieldName) {
+        // TODO: Complete this function
+        return '';
+    }
+
     public function getEndpoint()
     {
         return $this->serverEndpoint;

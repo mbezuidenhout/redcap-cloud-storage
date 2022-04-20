@@ -93,6 +93,15 @@ class Google extends CloudStoragePlatform {
         $this->getSignedUrl($bucketOrContainerName, $path, new \DateTime());
     }
 
+    /**
+     * Get the name of the storage platform.
+     *
+     * @return string
+     */
+    public function getPlatformName() {
+        return CloudStorage::PLATFORM_GOOGLE;
+    }
+
     public function getSignedUrl($bucketOrContainerName, $path, $createdDate, $duration = 'PT6H')
     {
         $duration = 3600;

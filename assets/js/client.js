@@ -50,8 +50,7 @@ Client = {
     },
     // we want to remove this param so after on save record in saves to correct record id.
     removeAutoParam: function () {
-        let url = new URL(window.location.href);
-        var temp = url
+        var temp = new URL(window.location.href);
         temp = temp.toString().replace('&auto=1', '');
         window.history.pushState({path: temp}, '', temp);
 
@@ -91,13 +90,14 @@ Client = {
     },
     processFields: function (path) {
         for (var prop in Client.fields) {
-            if (1 > jQuery("input[name=" + prop + "]").length) {
+            let input = jQuery("input[name=" + prop + "]");
+            if (1 > input.length) {
                 continue;
             }
-            $elem = jQuery("input[name=" + prop + "]").attr('type', 'hidden');
+            $elem = input.attr('type', 'hidden');
             var files = Client.downloadLinks[prop];
 
-            if ($elem.val() !== '' || (files != undefined)) {
+            if ($elem.val() !== '' || (files !== undefined)) {
 
                 if (path === undefined) {
                     var $links = $('<div id="' + prop + '-links"></div>')
@@ -119,7 +119,7 @@ Client = {
                     // if path is defined this mean the function was called after upload is complete. then we need to replace only the progress bar that completed.
                 } else {
                     // if download links are disable
-                    if ((files !== undefined && files[path] != '')) {
+                    if ((files !== undefined && files[path] !== '')) {
                         $("#" + Client.convertPathToASCII(path)).html('<a class="cloud-storage-link" target="_blank" href="' + files[path] + '">' + path.split('/').reverse()[0] + '</a><br>')
                     } else {
                         if (Client.isLinkDisabled) {
@@ -234,14 +234,15 @@ Client = {
 //            },
 
                 beforeSend: function () {
-                    if ($('#' + Client.convertPathToASCII(path)).length) {
-                        $('#' + Client.convertPathToASCII(path)).html('<progress data-name="' + file.name + '"></progress>' + file.name + '<span data-name="' + file.name + '"> <i class="fas fa-window-close"></i></span><br></div>')
+                    let elem = $('#' + Client.convertPathToASCII(path));
+                    if (elem.length) {
+                        elem.html('<progress data-name="' + file.name + '"></progress>' + file.name + '<span data-name="' + file.name + '"> <i class="fas fa-window-close"></i></span><br></div>')
                     } else {
                         $('<div id="' + Client.convertPathToASCII(path) + '"><progress data-name="' + file.name + '"></progress>' + file.name + '<span data-name="' + file.name + '"> <i class="fas fa-window-close"></i></span><br></div>').insertAfter(Client.form);
                     }
                 },
                 complete: function (xhr, status) {
-                    if (status == 'success') {
+                    if (status === 'success') {
                         if (Client.filesPath[field] === undefined || Client.filesPath[field] === '') {
                             Client.filesPath = {
                                 [field]: path
@@ -256,18 +257,22 @@ Client = {
                         jQuery("input[name=" + field + "]").val(Client.filesPath[field]);
 
                         // do not save for surveys
-                        if (Client.isAutoSaveDisabled == false) {
+                        if (Client.isAutoSaveDisabled === false) {
                             Client.saveRecord(path);
                         } else {
                             Client.processFields(path);
                         }
 
+                    } else if (status === 'error') {
+                        // Remove the progress bar dom element
+                        $('#' + Client.convertPathToASCII(path)).remove();
+                        alert('Unable to upload file "' + this.data.name + '"');
                     }
 
                 },
                 // Custom XMLHttpRequest
                 xhr: function () {
-                    var myXhr = $.ajaxSettings.xhr();
+                    let myXhr = $.ajaxSettings.xhr();
                     if (myXhr.upload) {
                         // For handling the progress of the upload
                         myXhr.upload.addEventListener('progress', function (e) {
@@ -284,7 +289,7 @@ Client = {
                         }, false);
                     }
 
-                    var _cancel = $('span[data-name="' + file.name + '"]');
+                    let _cancel = $('span[data-name="' + file.name + '"]');
 
                     _cancel.on('click', function () {
                         if (confirm('Are you sure you want to cancel upload for ' + file.name + '?')) {

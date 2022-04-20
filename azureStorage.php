@@ -81,7 +81,7 @@ class Azure extends CloudStoragePlatform {
         if($isSandbox) {
             $protocol = 'http';
         }
-        $endpoint = 'https://' . $accountName . "." . AzureResources::BLOB_BASE_DNS_NAME . "/";
+        $endpoint = 'https://' . $accountName . "." . AzureResources::BLOB_BASE_DNS_NAME;
         if($isSandbox) {
             $endpoint = $serverEndpoint . ($serverEndpoint[\strlen($serverEndpoint)] == '/' ? '' : '/') . "${accountName}";
         }
@@ -136,14 +136,16 @@ class Azure extends CloudStoragePlatform {
         $createdDate = new \DateTime();
         $url = $this->getSignedUrl($bucketOrContainer, $path, $createdDate);
 
-        $authScheme = new SharedKeyAuthScheme($this->accountName, $this->accountKey);
         // Required headers
         // TODO: Add x-ms-client-request-id header to correlate client requests with server-side activities
         $httpHeaders = array();
-        $httpHeaders['X-Ms-Date'] = $createdDate->format(\DateTimeInterface::RFC7231);
-        $httpHeaders['X-Ms-Version']  = BlobResources::STORAGE_API_LATEST_VERSION;
-        $httpHeaders['X-Ms-Blob-Type'] = \MicrosoftAzure\Storage\Blob\Models\BlobType::BLOCK_BLOB;
-        $httpHeaders['Authorization'] = $authScheme->getAuthorizationHeader( $httpHeaders, $url, array(), 'PUT');
+        $httpHeaders['x-ms-date'] = $createdDate->format(\DateTimeInterface::RFC7231);
+        $httpHeaders['x-ms-version']  = BlobResources::STORAGE_API_LATEST_VERSION;
+        $httpHeaders['x-ms-blob-type'] = \MicrosoftAzure\Storage\Blob\Models\BlobType::BLOCK_BLOB;
+
+        // For some reason including the Authorization header causes the upload to fail.
+        //$authScheme = new SharedKeyAuthScheme($this->accountName, $this->accountKey);
+        //$httpHeaders['Authorization'] = $authScheme->getAuthorizationHeader( $httpHeaders, $url, array(), 'PUT');
 
         $upload = new CloudUpload($url, $httpHeaders);
 
@@ -162,6 +164,8 @@ class Azure extends CloudStoragePlatform {
      */
     public function getSignedUrl($bucketOrContainerName, $path, $createdDate, $duration = 'PT6H')
     {
+        $bucketOrContainerName = \strtolower($bucketOrContainerName);
+        $path = \strtolower($path);
         $sasExpiry = new \DateTime();
         $sasExpiry->add(new \DateInterval($duration)); // Add 6 hours to current time.
         $helper = new BlobSharedAccessSignatureHelper($this->accountName, $this->accountKey);
@@ -190,8 +194,19 @@ class Azure extends CloudStoragePlatform {
         }
     }
 
+    /**
+     * Get the name of the storage platform.
+     *
+     * @return string
+     */
+    public function getPlatformName() {
+        return CloudStorage::PLATFORM_AZURE;
+    }
+
     public function getDownloadLink($bucketOrContainerName, $path)
     {
+        $bucketOrContainerName = \strtolower($bucketOrContainerName);
+        $path = \strtolower($path);
         if(\str_starts_with($path, $bucketOrContainerName)) {
             $path = \substr($path, strlen($bucketOrContainerName));
         }

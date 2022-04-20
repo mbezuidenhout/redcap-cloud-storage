@@ -33,6 +33,13 @@ abstract class CloudStoragePlatform
     abstract public function testConnection();
 
     /**
+     * Get the name of the storage platform.
+     *
+     * @return string
+     */
+    abstract public function getPlatformName();
+
+    /**
      * Create and return an instance of CloudUpload
      *
      * @return CloudUpload

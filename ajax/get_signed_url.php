@@ -13,7 +13,7 @@ try {
     if (isset($_GET['action']) && $_GET['action'] == 'upload') {
         $contentType = filter_var($_GET['content_type'], \FILTER_SANITIZE_STRING);
         $fileName    = filter_var($_GET['file_name'], \FILTER_SANITIZE_STRING);
-        $fileSize    = filter_var($_GET['file_size'], \FILTER_SANITIZE_NUMBER_INT);
+        //$fileSize    = filter_var($_GET['file_size'], \FILTER_SANITIZE_NUMBER_INT);
         $fieldName   = filter_var($_GET['field_name'], \FILTER_SANITIZE_STRING);
         $recordId    = filter_var($_GET['record_id'], \FILTER_SANITIZE_STRING);
         $eventId     = filter_var($_GET['event_id'], \FILTER_SANITIZE_NUMBER_INT);
@@ -26,13 +26,14 @@ try {
         $httpHeaders     = $upload->getHeaders();
         $url             = $upload->getUrl();
         \REDCap::logEvent(USERID . " generated Upload signed URL for $fileName ", '', null, null);
-        echo json_encode(array('status' => 'success', 'url' => $url, 'path' => $path, 'platform' => $module->getPlatform($fieldName), 'headers' => $httpHeaders));
+        echo json_encode(array('status' => 'success', 'url' => $url, 'path' => $path, 'platform' => $storagePlatform->getPlatformName(), 'headers' => $httpHeaders));
     } elseif (isset($_GET['action']) && $_GET['action'] == 'download') {
         $fileName = filter_var($_GET['file_name'], \FILTER_SANITIZE_STRING);
         $fieldName = filter_var($_GET['field_name'], \FILTER_SANITIZE_STRING);
         $bucketOrContainerName = $module->getBucketOrContainerNameByFieldName($fieldName);
         $platform = $module->getPlatformByFieldName($fieldName);
         $now = new \DateTime();
+        // Azure only allows lowercase paths.
         $link = $platform->getSignedUrl($bucketOrContainerName, $fileName, $now);
         \REDCap::logEvent("Generated signed download URL for $fileName by user id " . USERID, '', null, null);
 

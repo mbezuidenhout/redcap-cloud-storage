@@ -4,9 +4,10 @@ Datastore. The upload is done directly from user's browser to the cloud with no 
 
 ### Azure Storage configuration:
 1. Create an Azure account by going to https://azure.microsoft.com/
-2. Using the azure console add a new CORS Rule to the storage container. Use the wildcard '*' for Allowed Origins, \
-   Allowed headers and Exposed headers. (**Note: File uploads don't work without the appropriate CORS rules**)
-3. Create a Blob Container by going to you azure console.
+2. Get your storage account access key on the Azure console under Security + networking and enter it into your configuration.
+3. In your Azure console navigate to Resource sharing (CORS). Under Blob service add a new CORS Rule to the storage container. 
+Use the wildcard '*' for Allowed Origins, Allowed headers and Exposed headers. (**Note: File uploads don't work without the appropriate CORS rules**)
+4. Create a new Blob Container by going to you azure console.
 
 ### Google Storage configuration:
 1. Create your bucket using following link https://cloud.google.com/storage/docs/creating-buckets#storage-create-bucket-console

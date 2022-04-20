@@ -32,16 +32,14 @@
     },
     {
       "name": "Marius Bezuidenhout",
-      "email": "marius.bezuidenhout@gmail.com",
-      "institution": "N/A"
+      "email": "marius.bezuidenhout@gmail.com"
     }
   ],
   "permissions": [
     "redcap_every_page_top"
   ],
   "links": {
-    "control-center": [
-    ],
+    "control-center": [],
     "project": []
   },
   "no-auth-pages": [

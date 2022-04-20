@@ -354,6 +354,8 @@ class CloudStorage extends \ExternalModules\AbstractExternalModule
     {
         $prefix = $prefix != '' ? $prefix . '/' : '';
 
+        $fileName = urlencode($fileName);
+
         if ($this->project->longitudinal) {
             return $prefix . $recordId . '/' . $fieldName . '/' . \REDCap::getEventNames($eventId) . '/' . $instanceId . '/' . $fileName;
         }

@@ -95,7 +95,6 @@ class CloudStorage extends \ExternalModules\AbstractExternalModule
     {
         try {
             parent::__construct();
-
             if (isset($_GET['pid']) && $this->getProjectSetting('azure-enabled') || $this->getProjectSetting('google-enabled')) {
                 global $Proj;
 
@@ -245,7 +244,11 @@ class CloudStorage extends \ExternalModules\AbstractExternalModule
 
     public function saveRecord()
     {
-        $this->setRecordId(filter_var($_POST['record_id'], FILTER_SANITIZE_STRING));
+        if (empty($_POST['record_id'])) {
+            $this->setRecordId(\REDCap::reserveNewRecordId($this->getProjectId()));
+        } else {
+            $this->setRecordId(filter_var($_POST['record_id'], FILTER_SANITIZE_STRING));
+        }
         $data[\REDCap::getRecordIdField()] = $this->getRecordId();
         $filesPath = json_decode($_POST['files_path'], true);
         foreach ($filesPath as $field => $item) {
@@ -273,6 +276,10 @@ class CloudStorage extends \ExternalModules\AbstractExternalModule
         }
     }
 
+    public function redcap_survey_page_top() {
+
+    }
+
     public function redcap_every_page_top()
     {
         try {
@@ -290,8 +297,12 @@ class CloudStorage extends \ExternalModules\AbstractExternalModule
                     $this->setInstanceId(filter_var($_GET['instance'], FILTER_SANITIZE_NUMBER_INT));
                 }
 
-                // do not set the record for surveys
+                // Do not set the record id for new surveys otherwise user will be shown files for record id 1
                 if (isset($_GET['id'])) {
+                    global $this_record;
+                    if ($this->isSurvey) {
+                        $_GET['id'] = $this_record;
+                    }
                     $this->setRecordId(filter_var($_GET['id'], FILTER_SANITIZE_STRING));
                     $this->setRecord();
                     $this->prepareDownloadLinks();
@@ -354,7 +365,11 @@ class CloudStorage extends \ExternalModules\AbstractExternalModule
     {
         $prefix = $prefix != '' ? $prefix . '/' : '';
 
-        $fileName = urlencode($fileName);
+        $fileName = rawurlencode($fileName);
+
+        if (empty($recordId)) {
+            $recordId = time();
+        }
 
         if ($this->project->longitudinal) {
             return $prefix . $recordId . '/' . $fieldName . '/' . \REDCap::getEventNames($eventId) . '/' . $instanceId . '/' . $fileName;
@@ -510,7 +525,6 @@ class CloudStorage extends \ExternalModules\AbstractExternalModule
     {
         $filesPath = array();
         foreach($this->downloadLinks as $fieldName => $downloadLinks) {
-            $filesPath[$fieldName] = array();
             $files = array();
             foreach($downloadLinks as $downloadPath => $downloadLink) {
                 $files[] = $downloadPath;

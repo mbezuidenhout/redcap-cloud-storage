@@ -94,14 +94,14 @@ Client = {
             if (1 > input.length) {
                 continue;
             }
-            $elem = input.attr('type', 'hidden');
-            var files = Client.downloadLinks[prop];
+            let elem = input.attr('type', 'hidden');
+            let files = Client.downloadLinks[prop];
 
-            if ($elem.val() !== '' || (files !== undefined)) {
+            if (elem.val() !== '' || (files !== undefined)) {
 
                 if (path === undefined) {
-                    var $links = $('<div id="' + prop + '-links"></div>')
-                    for (var file in files) {
+                    let links = $('<div id="' + prop + '-links"></div>')
+                    for (let file in files) {
                         // if download links are disable
                         // if (files[file] != '') {
                         //     $links.append('<div id="' + Client.convertPathToASCII(file) + '"><a class="google-storage-link" target="_blank" href="' + files[file] + '">' + file + '</a><br></div>')
@@ -109,13 +109,13 @@ Client = {
                         //     $links.append('<div id="' + Client.convertPathToASCII(file) + '"><div class="file-name" data-file-id="' + Client.convertPathToASCII(file) + '">' + file + '</div> <a  data-field-name="' + prop + '" data-file-id="' + Client.convertPathToASCII(file) + '" data-file-name="' + file + '" class="get-download-link btn btn-primary btn-sm" href="#">Get Download Link</a><br></div>')
                         // }
                         if (Client.isLinkDisabled) {
-                            $links.append('<div id="' + Client.convertPathToASCII(file) + '"><div class="file-name" data-file-id="' + Client.convertPathToASCII(file) + '">' + file.split('/').reverse()[0] + '</div></div>')
+                            links.append('<div id="' + Client.convertPathToASCII(file) + '"><div class="file-name" data-file-id="' + Client.convertPathToASCII(file) + '">' + decodeURI(file.split('/').reverse()[0]) + '</div></div>')
                         } else {
-                            $links.append('<div id="' + Client.convertPathToASCII(file) + '"><div class="file-name" data-file-id="' + Client.convertPathToASCII(file) + '">' + file.split('/').reverse()[0] + '</div> <a  data-field-name="' + prop + '" data-file-id="' + Client.convertPathToASCII(file) + '" data-file-name="' + file + '" class="get-download-link btn btn-primary btn-sm" href="#">Get Download Link</a><br></div>')
+                            links.append('<div id="' + Client.convertPathToASCII(file) + '"><div class="file-name" data-file-id="' + Client.convertPathToASCII(file) + '">' + decodeURI(file.split('/').reverse()[0]) + '</div> <a  data-field-name="' + prop + '" data-file-id="' + Client.convertPathToASCII(file) + '" data-file-name="' + file + '" class="get-download-link btn btn-primary btn-sm" href="#">Get Download Link</a><br></div>')
                         }
 
                     }
-                    $links.insertAfter($elem);
+                    links.insertAfter(elem);
                     // if path is defined this mean the function was called after upload is complete. then we need to replace only the progress bar that completed.
                 } else {
                     // if download links are disable
@@ -123,16 +123,17 @@ Client = {
                         $("#" + Client.convertPathToASCII(path)).html('<a class="cloud-storage-link" target="_blank" href="' + files[path] + '">' + path.split('/').reverse()[0] + '</a><br>')
                     } else {
                         if (Client.isLinkDisabled) {
-                            $("#" + Client.convertPathToASCII(path)).html('<div class="file-name" data-file-id="' + Client.convertPathToASCII(path) + '">' + path.split('/').reverse()[0] + '</div><br>')
+                            $("#" + Client.convertPathToASCII(path)).html('<div class="file-name" data-file-id="' + Client.convertPathToASCII(path) + '">' + decodeURI(path.split('/').reverse()[0]) + '</div><br>')
                         } else {
-                            $("#" + Client.convertPathToASCII(path)).html('<div class="file-name" data-file-id="' + Client.convertPathToASCII(path) + '">' + path.split('/').reverse()[0] + '</div><a  data-field-name="' + prop + '" data-file-id="' + Client.convertPathToASCII(path) + '" data-file-name="' + path + '" class="get-download-link btn btn-primary btn-sm" href="#">Get Download Link</a><br>')
+                            $("#" + Client.convertPathToASCII(path)).html('<div class="file-name" data-file-id="' + Client.convertPathToASCII(path) + '">' + decodeURI(path.split('/').reverse()[0]) + '</div><a  data-field-name="' + prop + '" data-file-id="' + Client.convertPathToASCII(path) + '" data-file-name="' + path + '" class="get-download-link btn btn-primary btn-sm" href="#">Get Download Link</a><br>')
                         }
                     }
                 }
             }
             // only add form in the first time.
             if (path === undefined) {
-                $('<form class="cloud-storage-form" enctype="multipart/form-data"><input multiple class="cloud-storage-field" name="file" data-field="' + prop + '" type="file"/></form>').insertAfter($elem)
+                $('<form class="cloud-storage-form" enctype="multipart/form-data"><input multiple class="cloud-storage-field" name="file" data-field="' + prop + '" type="file"/></form>').insertAfter(elem)
+                $('#fileupload-container-' + prop).remove();
             }
 
             if (path !== undefined) {
@@ -141,7 +142,7 @@ Client = {
         }
     },
     uploadDialog: function (path) {
-        $("#uploaded-file-name").text(path);
+        $("#uploaded-file-name").text(decodeURI(path));
         $('#upload-dialog').dialog({
             bgiframe: true, modal: true, width: 400, position: ['center', 20],
             open: function () {
@@ -169,7 +170,7 @@ Client = {
             success: function (data) {
                 var response = JSON.parse(data)
                 if (response.status === 'success') {
-                    $("#" + id).html('<a target="_blank" href="' + response.link + '">' + file_name + '</a>')
+                    $("#" + id).html('<a target="_blank" href="' + response.link + '">' + decodeURI(file_name) + '</a>')
                 }
             },
             error: function (request, error) {

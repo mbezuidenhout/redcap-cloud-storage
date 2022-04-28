@@ -276,14 +276,11 @@ class CloudStorage extends \ExternalModules\AbstractExternalModule
         }
     }
 
-    public function redcap_survey_page_top() {
-
-    }
-
     public function redcap_every_page_top()
     {
+        global $public_survey;
         try {
-            $this->setIsSurvey(preg_match("/surveys\/\?s=[a-zA-Z0-9]{10}/m", $_SERVER['REQUEST_URI']));
+            $this->setIsSurvey(isset($public_survey) && $public_survey);
             // in case we are loading record homepage load its the record children if existed
             if ((strpos($_SERVER['SCRIPT_NAME'], 'DataEntry/index.php') !== false || $this->isSurvey()) && sizeof($this->platformFields) > 0) {
 

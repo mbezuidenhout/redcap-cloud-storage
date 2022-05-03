@@ -61,3 +61,13 @@ Use the wildcard '*' for Allowed Origins, Allowed headers and Exposed headers. (
    `@AZURE-STORAGE=[YOUR_BLOB_CONTAINER]`
 
 ![Alt text](assets/images/redcap-field-config.png?raw=true "REDCap Field Config")
+
+### Changelog
+
+#### 03-05-2022
+- Fixed uploads/downloads not working on surveys.
+
+#### 28-04-2022
+- Fixed public surveys.
+- Fixed multi page surveys.
+- Remove normal file upload link.

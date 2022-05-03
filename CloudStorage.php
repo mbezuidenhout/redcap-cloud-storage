@@ -280,7 +280,8 @@ class CloudStorage extends \ExternalModules\AbstractExternalModule
     {
         global $public_survey;
         try {
-            $this->setIsSurvey(isset($public_survey) && $public_survey);
+            $isSurveyPage = (isset($_GET['s']) && defined("NOAUTH") && PAGE == 'surveys/index.php');
+            $this->setIsSurvey($isSurveyPage || (isset($public_survey) && $public_survey));
             // in case we are loading record homepage load its the record children if existed
             if ((strpos($_SERVER['SCRIPT_NAME'], 'DataEntry/index.php') !== false || $this->isSurvey()) && sizeof($this->platformFields) > 0) {
 

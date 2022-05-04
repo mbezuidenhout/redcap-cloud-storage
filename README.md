@@ -64,6 +64,9 @@ Use the wildcard '*' for Allowed Origins, Allowed headers and Exposed headers. (
 
 ### Changelog
 
+#### 04-05-2022
+- Fixed @DEFAULT Action tag not working on multi page surveys
+
 #### 03-05-2022
 - Fixed uploads/downloads not working on surveys.
 

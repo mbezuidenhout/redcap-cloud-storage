@@ -298,7 +298,7 @@ class CloudStorage extends \ExternalModules\AbstractExternalModule
                 // Do not set the record id for new surveys otherwise user will be shown files for record id 1
                 if (isset($_GET['id'])) {
                     global $this_record;
-                    if ($this->isSurvey) {
+                    if ($this->isSurvey && !empty($this_record)) {
                         $_GET['id'] = $this_record;
                     }
                     $this->setRecordId(filter_var($_GET['id'], FILTER_SANITIZE_STRING));
